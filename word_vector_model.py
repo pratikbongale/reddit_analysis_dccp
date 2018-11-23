@@ -95,27 +95,42 @@ def get_model(documents):
     return model
 
 def get_document_vectors(wv_model, X):
+    max_len = 0
+    features = list()
+    for post in X:
+        n = len(post)
+        sum = np.zeros(n)
+        for word in post:
+            sum += wv_model.wv[word]
 
+        # compute an average of all words in a post
+        avg = sum / n
+        max_len = max( max_len, len(avg) )
+        features.append(avg)
 
-
-    vec = wv_model.wv['computer']
-    # compute an average of all words in a post
-
-    pass
+    return features
 
 if __name__ == '__main__':
 
-    dataset_dir = os.path.join('dataset', 'reddit-dataset')
+    dataset_dir = 'dataset'
     subreddits_fname = ['entertainment_anime.csv', 'entertainment_comicbooks.csv', 'entertainment_harrypotter.csv',
                         'entertainment_movies.csv', 'entertainment_music.csv', 'entertainment_starwars.csv']
 
-    for sr in subreddits_fname:
-        fpath = os.path.join(dataset_dir, sr)
-        X, y = read_file(fpath)
-        splits = get_dataset_splits(X, y)
-        wv_model = get_model(X)
-        doc_vectors = get_document_vectors(wv_model, X)
+    test_sr = subreddits_fname[0]
+    fpath = os.path.join(dataset_dir, test_sr)
+    X, y = read_file(fpath)
+    splits = get_dataset_splits(X, y)
+    wv_model = get_model(X)
+    doc_vectors = get_document_vectors(wv_model, X)
 
+    # for sr in subreddits_fname:
+    #     fpath = os.path.join(dataset_dir, sr)
+    #     X, y = read_file(fpath)
+    #     splits = get_dataset_splits(X, y)
+    #     wv_model = get_model(X)
+    #     doc_vectors = get_document_vectors(wv_model, X)
+    #
+    #
 
 
 
