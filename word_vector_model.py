@@ -2,19 +2,25 @@ from gensim.models import Word2Vec
 from sklearn.model_selection import train_test_split
 from nltk.tokenize import RegexpTokenizer
 from nltk.corpus import stopwords
-from nltk.stem.porter import PorterStemmer
-from sklearn.cross_validation import StratifiedKFold
+from nltk.stem.snowball import SnowballStemmer
 import numpy as np
 import csv
 import os
 
-def clean(posts):
+def clean(posts, labels):
+    '''
+
+    :param posts: list of strings
+    :param labels: list of strings
+    :return: list of lists(tokens)
+    '''
+
 
     # Cleaning preparation
     re_pattern = '[a-z]{3,}'  # only words with length 3 or more
     stopwords_set = set(stopwords.words('english'))     # get stopwords
     tokenizer = RegexpTokenizer(re_pattern)             # build tokenizer
-    stemmer = PorterStemmer()
+    stemmer = SnowballStemmer("english")
 
     # Cleaning steps:
     # Convert to lower case
@@ -23,16 +29,23 @@ def clean(posts):
     # Stem words
 
     cleaned_docs = list()
-    for p in posts.T:
-        p = p[0]
+    deleted_doc_idx = list()
+    for i, p in enumerate(posts):
+        p = p.strip()
         text = p.lower()
         tokens = tokenizer.tokenize(text)   # only keep words with length 3 or more
         tokens_wo_stopwords = [w for w in tokens if w not in stopwords_set]
         doc_tokens = [stemmer.stem(w) for w in tokens_wo_stopwords] # stemming
         if len(doc_tokens) > 3:
             cleaned_docs.append(doc_tokens)
+        else:
+            deleted_doc_idx.append(i)
 
-    return cleaned_docs
+    arr = np.array(labels)
+    arr = np.delete(arr, deleted_doc_idx, axis=0)
+    cleaned_labels = arr.tolist()
+
+    return cleaned_docs, cleaned_labels
 
 def read_file(fname):
 
@@ -104,17 +117,15 @@ def get_model(sentences):
     return model
 
 def get_document_vectors(wv_model, X):
-    max_len = 0
     features = list()
-    for post in X:
-        n = len(post)
+    for post_tokens in X:
+        n = wv_model.vector_size
         sum = np.zeros(n)
-        for word in post:
+        for word in post_tokens:
             sum += wv_model.wv[word]
 
         # compute an average of all words in a post
-        avg = sum / n
-        max_len = max( max_len, len(avg) )
+        avg = sum / len(post_tokens)
         features.append(avg)
 
     return features
@@ -125,16 +136,9 @@ if __name__ == '__main__':
     subreddits_fname = ['entertainment_anime.csv', 'entertainment_comicbooks.csv', 'entertainment_harrypotter.csv',
                         'entertainment_movies.csv']
 
-    # test_sr = subreddits_fname[0]
-    # fpath = os.path.join(dataset_dir, test_sr)
-    # X, y = read_file(fpath)     # returns documents with their corresponding labels
-    #
     # wv_model = get_model(X)     # wv dimension : 100
     # doc_vectors = get_document_vectors(wv_model, X)
     # splits = get_dataset_splits(doc_vectors, y)
-
-
-
 
     # build dataset with equal priors
     X = list()
@@ -153,12 +157,20 @@ if __name__ == '__main__':
     splits = get_dataset_splits(X, y)
 
     # clean and tokenize the dataset
-
+    X_train = splits['X_train']
+    y_train = splits['y_train']
+    X_train, y_train = clean(X_train, y_train)
 
     # train a word2vec model using only the training data
+    wv_model = get_model(X_train)  # wv dimension : 100
+    doc_vectors = get_document_vectors(wv_model, X_train)
+
+    # test model on test dataset
+    X_test = splits['X_test']
+    y_test = splits['y_test']
+    X_test, y_test = clean(X_test, y_test)
 
 
-    # test model on test data
 
 
 
