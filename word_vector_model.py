@@ -1,18 +1,25 @@
 from gensim.models import Word2Vec
+from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
 from nltk.tokenize import RegexpTokenizer
 from nltk.corpus import stopwords
 from nltk.stem.snowball import SnowballStemmer
-from sklearn.ensemble import AdaBoostClassifier
+from sklearn.ensemble import AdaBoostClassifier, GradientBoostingClassifier, RandomForestClassifier
 from sklearn.metrics import accuracy_score
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.neural_network import MLPClassifier
+from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.feature_extraction.text import TfidfTransformer
-from sklearn.naive_bayes import MultinomialNB
+from sklearn.naive_bayes import MultinomialNB, GaussianNB
+from sklearn.metrics import confusion_matrix
 
-from collections import Counter
+import matplotlib.pyplot as plt
 import numpy as np
+import seaborn as sns
+import pandas as pd
 import csv
 import os
 
@@ -181,10 +188,7 @@ def get_document_vectors(wv_model, X):
 
     return features
 
-def wv_adaboost_model(X_train, X_test):
-
-    # get features from word2vec model
-    X_train, X_test = get_wv_features(X_train, X_test)
+def evaluate_adaboost_model(X_train, X_test):
 
     # train a multi-class classifier model using only the training data
     clf = AdaBoostClassifier(DecisionTreeClassifier(max_depth=2), n_estimators=600, learning_rate=0.5)
@@ -195,10 +199,7 @@ def wv_adaboost_model(X_train, X_test):
 
     return y_pred
 
-def bow_nb_model(X_train, X_test):
-
-    # get fetures from bow model
-    X_train, X_test = get_bow_features(X_train, X_test)
+def evaluate_nb_model(X_train, X_test):
 
     # train a multi-class classifier model using only the training data
     clf = MultinomialNB()
@@ -208,6 +209,63 @@ def bow_nb_model(X_train, X_test):
     y_pred = clf.predict(X_test)
 
     return y_pred
+
+def evaluate_svc_model(X_train, X_test):
+
+    # train a multi-class classifier model using only the training data
+    clf = SVC()
+    clf.fit(X_train, y_train)
+
+    # get predictions from the trained classifier model
+    y_pred = clf.predict(X_test)
+
+    return y_pred
+
+def check_classify_types(X_train, Y_train, X_test, Y_test, list_classifiers, features, verbose=True):
+
+    dict_models = {}
+    for classifier_name, classifier in list(list_classifiers.items())[:8]:
+        classifier.fit(X_train, Y_train)
+
+        Y_pred = classifier.predict(X_test)
+        plt.title(classifier_name)
+        plot_confusion_matrix(Y_test, Y_pred)
+
+        fig_name = '_'.join([features, classifier_name, '.png'])
+        plt.savefig('Results/' + fig_name)
+
+        train_score = classifier.score(X_train, Y_train)
+        test_score = classifier.score(X_test, Y_test)
+
+        dict_models[classifier_name] = {'model': classifier, 'train_score': train_score, 'test_score': test_score,}
+
+    return dict_models
+
+
+def display_models(dict_models, sort_by='test_score'):
+    cls = [key for key in dict_models.keys()]
+    test_s = [dict_models[key]['test_score'] for key in cls]
+    training_s = [dict_models[key]['train_score'] for key in cls]
+
+    df_ = pd.DataFrame(data=np.zeros(shape=(len(cls), 3)),
+                       columns=['classifier', 'train_score', 'test_score'])
+    for ii in range(0, len(cls)):
+        df_.loc[ii, 'classifier'] = cls[ii]
+        df_.loc[ii, 'train_score'] = training_s[ii]
+        df_.loc[ii, 'test_score'] = test_s[ii]
+
+    print(df_.sort_values(by=sort_by, ascending=False))
+
+def plot_confusion_matrix(y_test, y_pred):
+    conf_mat = confusion_matrix(y_test, y_pred)
+    fig, ax = plt.subplots(figsize=(10, 10))
+
+    labels = set(y_test)
+    sns.heatmap(conf_mat, annot=True, fmt='d',
+                xticklabels=labels, yticklabels=labels)
+    plt.ylabel('Actual')
+    plt.xlabel('Predicted')
+    # plt.show()
 
 if __name__ == '__main__':
 
@@ -240,15 +298,32 @@ if __name__ == '__main__':
     y_test = splits['y_test']
     X_test, y_test = clean(X_test, y_test)
 
-    y_pred = wv_adaboost_model(X_train, X_test)
-    accuracy = accuracy_score(y_test, y_pred)
-    print('Adaboost accuracy:', accuracy)
+    X_train_bow, X_test_bow = get_bow_features(X_train, X_test)
+    X_train_wv, X_test_wv = get_wv_features(X_train, X_test)
 
-    y_pred = bow_nb_model(X_train, X_test)
-    accuracy = accuracy_score(y_test, y_pred)
-    print('Naive Bayes accuracy:', accuracy)
+    list_classifiers = {
+        "Logistic Regression": LogisticRegression(),
+        "Nearest Neighbors": KNeighborsClassifier(),
+        "Linear SVM": SVC(),
+        "Gradient Boosting Classifier": GradientBoostingClassifier(n_estimators=1000),
+        "Decision Tree": DecisionTreeClassifier(max_depth=2),
+        "Random Forest": RandomForestClassifier(n_estimators=1000),
+        "Naive Bayes Multinomial": MultinomialNB(),
+        "Adaboost": AdaBoostClassifier(DecisionTreeClassifier(max_depth=2), n_estimators=600, learning_rate=0.5)
+    }
 
+    print('='*30)
+    print('Bag of words')
+    print('=' * 30)
+    dict_models = check_classify_types(X_train_bow, y_train, X_test_bow, y_test, list_classifiers, 'bow')
+    display_models(dict_models)
 
+    del list_classifiers["Naive Bayes Multinomial"]
+    print('=' * 30)
+    print('Word vectors')
+    print('=' * 30)
+    dict_models = check_classify_types(X_train_wv, y_train, X_test_wv, y_test, list_classifiers, 'wv')
+    display_models(dict_models)
 
 
 
