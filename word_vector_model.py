@@ -48,9 +48,8 @@ def clean(posts, labels):
     :return: list of lists(tokens)
     '''
 
-
     # Cleaning preparation
-    re_pattern = '[a-z]{3,}'  # only words with length 3 or more
+    re_pattern = '[a-z]{2,}'  # only words with length 2 or more
     stopwords_set = set(stopwords.words('english'))     # get stopwords
     tokenizer = RegexpTokenizer(re_pattern)             # build tokenizer
     stemmer = SnowballStemmer("english")
@@ -67,10 +66,10 @@ def clean(posts, labels):
         p = p.strip()
         text = p.lower()
         tokens = tokenizer.tokenize(text)   # only keep words with length 3 or more
-        tokens_wo_stopwords = [w for w in tokens if w not in stopwords_set]
-        doc_tokens = [stemmer.stem(w) for w in tokens_wo_stopwords] # stemming
-        if len(doc_tokens) > 3:
-            cleaned_docs.append(doc_tokens)
+        tokens = [w for w in tokens if w not in stopwords_set]
+        tokens = [stemmer.stem(w) for w in tokens] # stemming
+        if len(tokens) > 3:
+            cleaned_docs.append(tokens)
         else:
             deleted_doc_idx.append(i)
 
@@ -79,8 +78,6 @@ def clean(posts, labels):
     cleaned_labels = arr.tolist()
 
     return cleaned_docs, cleaned_labels
-
-
 
 def get_dataset_splits(X, y):
 
@@ -108,9 +105,9 @@ def get_wv_model(sentences):
 
     # build a word2vec model
     model = Word2Vec(sentences,
-                     size=100,  # vector size
+                     size=40,  # vector size
                      window=5,  # context window
-                     min_count=1,
+                     min_count=10, # count in corpus
                      workers=4)
 
     return model
@@ -120,11 +117,14 @@ def get_document_vectors(wv_model, X):
     for post_tokens in X:
         n = wv_model.vector_size
         sum = np.zeros(n)
+        wc = 0.0
         for word in post_tokens:
-            sum += wv_model.wv[word]
+            if word in wv_model.wv:
+                sum += wv_model.wv[word]
+                wc += 1.0
 
         # compute an average of all words in a post
-        avg = sum / len(post_tokens)
+        avg = sum / wc
         avg = avg.tolist()
         features.append(avg)
 
