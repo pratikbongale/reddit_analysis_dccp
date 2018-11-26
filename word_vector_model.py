@@ -153,8 +153,6 @@ if __name__ == '__main__':
         X.extend(t)
         y.extend(l)
 
-    # print('Complete dataset', len(X))
-
     # split dataset (train/test) preserving the percentage of samples for each class
     splits = get_dataset_splits(X, y)
 
