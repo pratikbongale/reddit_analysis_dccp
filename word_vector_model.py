@@ -68,7 +68,7 @@ def clean(posts, labels):
         tokens = tokenizer.tokenize(text)   # only keep words with length 3 or more
         tokens = [w for w in tokens if w not in stopwords_set]
         tokens = [stemmer.stem(w) for w in tokens] # stemming
-        if len(tokens) > 3:
+        if len(tokens) > 4:
             cleaned_docs.append(tokens)
         else:
             deleted_doc_idx.append(i)
@@ -101,11 +101,16 @@ def get_dataset_splits(X, y):
 
     return data_splits
 
+def get_bow_features(sentences):
+
+
+    pass
+
 def get_wv_model(sentences):
 
     # build a word2vec model
     model = Word2Vec(sentences,
-                     size=40,  # vector size
+                     size=200,  # vector size
                      window=5,  # context window
                      min_count=10, # count in corpus
                      workers=4)
@@ -124,7 +129,10 @@ def get_document_vectors(wv_model, X):
                 wc += 1.0
 
         # compute an average of all words in a post
-        avg = sum / wc
+        if wc > 0.0:
+            avg = sum / wc
+        else:
+            avg = sum
         avg = avg.tolist()
         features.append(avg)
 
