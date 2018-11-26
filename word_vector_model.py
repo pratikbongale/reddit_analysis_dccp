@@ -6,6 +6,12 @@ from nltk.stem.snowball import SnowballStemmer
 from sklearn.ensemble import AdaBoostClassifier
 from sklearn.metrics import accuracy_score
 from sklearn.tree import DecisionTreeClassifier
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.feature_extraction.text import TfidfTransformer
+from sklearn.naive_bayes import MultinomialNB
+
+from collections import Counter
 import numpy as np
 import csv
 import os
@@ -68,7 +74,7 @@ def clean(posts, labels):
         tokens = tokenizer.tokenize(text)   # only keep words with length 3 or more
         tokens = [w for w in tokens if w not in stopwords_set]
         tokens = [stemmer.stem(w) for w in tokens] # stemming
-        if len(tokens) > 4:
+        if len(tokens) > 4:     # we need atleast 4 words in a post
             cleaned_docs.append(tokens)
         else:
             deleted_doc_idx.append(i)
@@ -101,10 +107,47 @@ def get_dataset_splits(X, y):
 
     return data_splits
 
-def get_bow_features(sentences):
+def get_bow_features(X_train, X_test):
+
+    #
+    # Train features
+    #
+    inp = list()
+    for s in X_train:
+        inp.append(' '.join(s))
+
+    count_vect = CountVectorizer(min_df=10,
+                                 encoding='latin-1',
+                                 ngram_range=(1, 3),
+                                 stop_words='english')
+
+    X_train_counts = count_vect.fit_transform(inp)
+
+    tfidf_transformer = TfidfTransformer(sublinear_tf=True,norm='l2')
+
+    X_train = tfidf_transformer.fit_transform(X_train_counts)
 
 
-    pass
+    #
+    # Test features
+    #
+    inp = list()
+    for s in X_test:
+        inp.append(' '.join(s))
+
+    X_test = count_vect.transform(inp)
+
+    return X_train, X_test
+
+def get_wv_features(X_train, X_test):
+
+    corpus = X_train + X_test
+    wv_model = get_wv_model(corpus)  # needs the entire corpus to create vocabulary
+    wv_model.train(corpus, total_examples=len(corpus), epochs=wv_model.iter)
+    X_train = get_document_vectors(wv_model, X_train)
+    X_test = get_document_vectors(wv_model, X_test)
+
+    return X_train, X_test
 
 def get_wv_model(sentences):
 
@@ -138,6 +181,34 @@ def get_document_vectors(wv_model, X):
 
     return features
 
+def wv_adaboost_model(X_train, X_test):
+
+    # get features from word2vec model
+    X_train, X_test = get_wv_features(X_train, X_test)
+
+    # train a multi-class classifier model using only the training data
+    clf = AdaBoostClassifier(DecisionTreeClassifier(max_depth=2), n_estimators=600, learning_rate=0.5)
+    clf.fit(X_train, y_train)
+
+    # get predictions from the trained classifier model
+    y_pred = clf.predict(X_test)
+
+    return y_pred
+
+def bow_nb_model(X_train, X_test):
+
+    # get fetures from bow model
+    X_train, X_test = get_bow_features(X_train, X_test)
+
+    # train a multi-class classifier model using only the training data
+    clf = MultinomialNB()
+    clf.fit(X_train, y_train)
+
+    # get predictions from the trained classifier model
+    y_pred = clf.predict(X_test)
+
+    return y_pred
+
 if __name__ == '__main__':
 
     dataset_dir = 'dataset'
@@ -145,10 +216,6 @@ if __name__ == '__main__':
     #                     'entertainment_movies.csv']
 
     subreddits_fname = ['entertainment_music.csv', 'gaming_gaming.csv', 'learning_science.csv', 'lifestyle_food.csv', 'news_politics.csv']
-
-    # wv_model = get_model(X)     # wv dimension : 100
-    # doc_vectors = get_document_vectors(wv_model, X)
-    # splits = get_dataset_splits(doc_vectors, y)
 
     # build dataset with equal priors
     X = list()
@@ -173,21 +240,16 @@ if __name__ == '__main__':
     y_test = splits['y_test']
     X_test, y_test = clean(X_test, y_test)
 
-    # train the word vector model on entire dataset
-    corpus = X_train + X_test
-    wv_model = get_wv_model(corpus)   # needs the entire corpus to create vocabulary
-    wv_model.train(corpus, total_examples=len(corpus), epochs=wv_model.iter)
-    X_train = get_document_vectors(wv_model, X_train)
-
-    # train a multi-class classifier model using only the training data
-    clf = AdaBoostClassifier(DecisionTreeClassifier(max_depth=2), n_estimators=600, learning_rate=0.5)
-    clf.fit(X_train, y_train)
-
-    # get document vectors using word vector model
-    X_test = get_document_vectors(wv_model, X_test)
-
-    # get predictions from the trained classifier model
-    y_pred = clf.predict(X_test)
+    y_pred = wv_adaboost_model(X_train, X_test)
     accuracy = accuracy_score(y_test, y_pred)
+    print('Adaboost accuracy:', accuracy)
 
-    print('Accuracy:', accuracy)
+    y_pred = bow_nb_model(X_train, X_test)
+    accuracy = accuracy_score(y_test, y_pred)
+    print('Naive Bayes accuracy:', accuracy)
+
+
+
+
+
+
