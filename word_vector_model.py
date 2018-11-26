@@ -3,6 +3,9 @@ from sklearn.model_selection import train_test_split
 from nltk.tokenize import RegexpTokenizer
 from nltk.corpus import stopwords
 from nltk.stem.snowball import SnowballStemmer
+from sklearn.ensemble import AdaBoostClassifier
+from sklearn.metrics import accuracy_score
+from sklearn.tree import DecisionTreeClassifier
 import numpy as np
 import csv
 import os
@@ -99,7 +102,7 @@ def get_dataset_splits(X, y):
 
     return data_splits
 
-def get_model(sentences):
+def get_wv_model(sentences):
 
     # build a word2vec model
     model = Word2Vec(sentences,
@@ -107,12 +110,6 @@ def get_model(sentences):
                      window=5,  # context window
                      min_count=1,
                      workers=4)
-
-    # # build vocabulary
-    # model.build_vocab(sentences)
-
-    # train model
-    model.train(sentences, total_examples=len(sentences), epochs=model.iter)
 
     return model
 
@@ -126,6 +123,7 @@ def get_document_vectors(wv_model, X):
 
         # compute an average of all words in a post
         avg = sum / len(post_tokens)
+        avg = avg.tolist()
         features.append(avg)
 
     return features
@@ -161,19 +159,25 @@ if __name__ == '__main__':
     y_train = splits['y_train']
     X_train, y_train = clean(X_train, y_train)
 
-    # train a word2vec model using only the training data
-    wv_model = get_model(X_train)  # wv dimension : 100
-    doc_vectors = get_document_vectors(wv_model, X_train)
-
-    # test model on test dataset
     X_test = splits['X_test']
     y_test = splits['y_test']
     X_test, y_test = clean(X_test, y_test)
 
+    # train the word vector model on entire dataset
+    corpus = X_train + X_test
+    wv_model = get_wv_model(corpus)   # needs the entire corpus to create vocabulary
+    wv_model.train(corpus, total_examples=len(corpus), epochs=wv_model.iter)
+    X_train = get_document_vectors(wv_model, X_train)
 
+    # train a multi-class classifier model using only the training data
+    clf = AdaBoostClassifier(DecisionTreeClassifier(max_depth=2), n_estimators=600, learning_rate=0.5)
+    clf.fit(X_train, y_train)
 
+    # get document vectors using word vector model
+    X_test = get_document_vectors(wv_model, X_test)
 
+    # get predictions from the trained classifier model
+    y_pred = clf.predict(X_test)
+    accuracy = accuracy_score(y_test, y_pred)
 
-
-
-
+    print('Accuracy:', accuracy)
