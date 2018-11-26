@@ -3,6 +3,7 @@ from sklearn.model_selection import train_test_split
 from nltk.tokenize import RegexpTokenizer
 from nltk.corpus import stopwords
 from nltk.stem.porter import PorterStemmer
+from sklearn.cross_validation import StratifiedKFold
 import numpy as np
 import csv
 import os
@@ -22,7 +23,8 @@ def clean(posts):
     # Stem words
 
     cleaned_docs = list()
-    for p in posts:
+    for p in posts.T:
+        p = p[0]
         text = p.lower()
         tokens = tokenizer.tokenize(text)   # only keep words with length 3 or more
         tokens_wo_stopwords = [w for w in tokens if w not in stopwords_set]
@@ -38,28 +40,31 @@ def read_file(fname):
         datasets = csv.reader(csvfile, delimiter=',')
 
         threads = list()    # list of list
-        for row in datasets:
+        for i, row in enumerate(datasets):
             threads.append(row)
+            if i > 200:
+                break
 
         # convert to ndarray
-        threads = np.asarray(threads)
+        threads = np.array(threads)
 
-        # get rid of the unnecessary columns
+        # get rid of the unnecessary rows and column
         threads = threads[2:,:] # remove the header lines
-        thread_upvotes = np.where(threads[:,8] > 0)     # remove posts with negative upvotes
+
+        # get rid of empty posts
+        threads = threads[threads[:,2] != '']
+
+        upvotes = threads[:,8].astype(float)
+        thread_upvotes = np.where(upvotes > 0.0)     # remove posts with negative upvotes
         thread_titles = np.take(threads[:, 2], thread_upvotes)  # X
         subreddit_labels = np.take(threads[:, 4], thread_upvotes)   # y
 
-        X = clean(thread_titles)
+        X = thread_titles
         y = subreddit_labels
 
     return X, y
 
 def get_dataset_splits(X, y):
-
-    if not isinstance(X, np.ndarray) or not isinstance(y, np.ndarray):
-        X = np.asarray(X)
-        y = np.asarray(y)
 
     # seed for random number generator
     seed = 42
@@ -70,7 +75,8 @@ def get_dataset_splits(X, y):
     X_train, X_test, y_train, y_test = train_test_split(X, y,
                                                         test_size=0.3,
                                                         random_state=seed,
-                                                        shuffle=False)
+                                                        shuffle=True,
+                                                        stratify=y)
 
     data_splits['X_train'] = X_train
     data_splits['y_train'] = y_train
@@ -80,17 +86,20 @@ def get_dataset_splits(X, y):
 
     return data_splits
 
-def get_model(documents):
+def get_model(sentences):
 
-    # build a word2vec model and vocabulary
-    model = Word2Vec(documents,
+    # build a word2vec model
+    model = Word2Vec(sentences,
                      size=100,  # vector size
                      window=5,  # context window
-                     min_count=10,
+                     min_count=1,
                      workers=4)
 
+    # # build vocabulary
+    # model.build_vocab(sentences)
+
     # train model
-    model.train(documents)
+    model.train(sentences, total_examples=len(sentences), epochs=model.iter)
 
     return model
 
@@ -114,23 +123,43 @@ if __name__ == '__main__':
 
     dataset_dir = 'dataset'
     subreddits_fname = ['entertainment_anime.csv', 'entertainment_comicbooks.csv', 'entertainment_harrypotter.csv',
-                        'entertainment_movies.csv', 'entertainment_music.csv', 'entertainment_starwars.csv']
+                        'entertainment_movies.csv']
 
-    test_sr = subreddits_fname[0]
-    fpath = os.path.join(dataset_dir, test_sr)
-    X, y = read_file(fpath)
+    # test_sr = subreddits_fname[0]
+    # fpath = os.path.join(dataset_dir, test_sr)
+    # X, y = read_file(fpath)     # returns documents with their corresponding labels
+    #
+    # wv_model = get_model(X)     # wv dimension : 100
+    # doc_vectors = get_document_vectors(wv_model, X)
+    # splits = get_dataset_splits(doc_vectors, y)
+
+
+
+
+    # build dataset with equal priors
+    X = list()
+    y = list()
+    for sr in subreddits_fname:
+        fpath = os.path.join(dataset_dir, sr)
+        threads, labels = read_file(fpath)
+        t = threads[0].tolist()
+        l = labels[0].tolist()
+        X.extend(t)
+        y.extend(l)
+
+    print('Complete dataset', len(X))
+
+    # split dataset (train/test) preserving the percentage of samples for each class
     splits = get_dataset_splits(X, y)
-    wv_model = get_model(X)
-    doc_vectors = get_document_vectors(wv_model, X)
 
-    # for sr in subreddits_fname:
-    #     fpath = os.path.join(dataset_dir, sr)
-    #     X, y = read_file(fpath)
-    #     splits = get_dataset_splits(X, y)
-    #     wv_model = get_model(X)
-    #     doc_vectors = get_document_vectors(wv_model, X)
-    #
-    #
+    # clean and tokenize the dataset
+
+
+    # train a word2vec model using only the training data
+
+
+    # test model on test data
+
 
 
 
