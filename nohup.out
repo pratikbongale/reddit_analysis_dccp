@@ -1,0 +1,49 @@
+Phase 1:
+==============================
+Bag of words
+==============================
+                     classifier  train_score  test_score
+5                 Random Forest     0.999721    0.981691
+0           Logistic Regression     0.977250    0.930689
+6       Naive Bayes Multinomial     0.958492    0.923714
+1             Nearest Neighbors     0.893862    0.879032
+3  Gradient Boosting Classifier     0.999443    0.823452
+4                 Decision Tree     0.863776    0.639712
+7                      Adaboost     0.728016    0.511770
+2                    Linear SVM     0.226669    0.229948
+==============================
+Word vectors
+==============================
+                     classifier  train_score  test_score
+5                 Random Forest     0.999721    0.995205
+3  Gradient Boosting Classifier     0.999721    0.992589
+4                 Decision Tree     0.999721    0.986704
+1             Nearest Neighbors     0.953199    0.893418
+6                      Adaboost     0.853190    0.839146
+0           Logistic Regression     0.830625    0.816696
+2                    Linear SVM     0.803882    0.795554
+
+Phase 2:
+==============================
+Bag of words
+==============================
+                     classifier  train_score  test_score
+5                 Random Forest     0.999753    0.983648
+0           Logistic Regression     0.972298    0.902270
+6       Naive Bayes Multinomial     0.942782    0.896883
+1             Nearest Neighbors     0.923242    0.852828
+3  Gradient Boosting Classifier     0.999423    0.805117
+4                 Decision Tree     0.844917    0.643517
+7                      Adaboost     0.740292    0.494998
+2                    Linear SVM     0.234397    0.227010
+==============================
+Word vectors
+==============================
+                     classifier  train_score  test_score
+5                 Random Forest     1.000000    0.992305
+3  Gradient Boosting Classifier     1.000000    0.989804
+4                 Decision Tree     1.000000    0.986533
+1             Nearest Neighbors     0.953170    0.865910
+6                      Adaboost     0.859180    0.841093
+0           Logistic Regression     0.775167    0.756252
+2                    Linear SVM     0.753731    0.729704

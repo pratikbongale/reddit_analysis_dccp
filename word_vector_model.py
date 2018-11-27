@@ -5,15 +5,12 @@ from nltk.tokenize import RegexpTokenizer
 from nltk.corpus import stopwords
 from nltk.stem.snowball import SnowballStemmer
 from sklearn.ensemble import AdaBoostClassifier, GradientBoostingClassifier, RandomForestClassifier
-from sklearn.metrics import accuracy_score
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.neural_network import MLPClassifier
 from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
-from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.feature_extraction.text import TfidfTransformer
-from sklearn.naive_bayes import MultinomialNB, GaussianNB
+from sklearn.naive_bayes import MultinomialNB
 from sklearn.metrics import confusion_matrix
 
 import matplotlib.pyplot as plt
@@ -31,22 +28,31 @@ def read_file(fname):
         threads = list()    # list of list
         for i, row in enumerate(datasets):
             threads.append(row)
-            if i > 200:
+            if i > 5000:
                 break
 
         # convert to ndarray
         threads = np.array(threads)
 
+        if len(threads[0]) == 12:
+            post_col = 1
+            upvotes_col = 7
+            subr_col = 3
+        else:
+            post_col = 2
+            upvotes_col = 8
+            subr_col = 4
+
         # get rid of the unnecessary rows and column
         threads = threads[2:,:] # remove the header lines
 
         # get rid of empty posts
-        threads = threads[threads[:,1] != '']
+        threads = threads[threads[:,post_col] != '']
 
-        upvotes = threads[:,7].astype(float)
+        upvotes = threads[:,upvotes_col].astype(float)
         thread_upvotes = np.where(upvotes > 0.0)     # remove posts with negative upvotes
-        thread_titles = np.take(threads[:, 1], thread_upvotes)  # X
-        subreddit_labels = np.take(threads[:, 3], thread_upvotes)   # y
+        thread_titles = np.take(threads[:, post_col], thread_upvotes)  # X
+        subreddit_labels = np.take(threads[:, subr_col], thread_upvotes)   # y
 
         X = thread_titles
         y = subreddit_labels
@@ -270,15 +276,18 @@ def plot_confusion_matrix(y_test, y_pred):
 if __name__ == '__main__':
 
     dataset_dir = 'dataset'
-    # subreddits_fname = ['entertainment_anime.csv', 'entertainment_comicbooks.csv', 'entertainment_harrypotter.csv',
-    #                     'entertainment_movies.csv']
 
-    subreddits_fname = ['entertainment_music.csv', 'gaming_gaming.csv', 'learning_science.csv', 'lifestyle_food.csv', 'news_politics.csv']
+    subreddits_fname_phase1 = ['entertainment_music.csv', 'gaming_gaming.csv', 'learning_science.csv',
+                               'lifestyle_food.csv', 'news_politics.csv']
+
+    subreddits_fname_phase2 = ['entertainment_anime.csv', 'entertainment_comicbooks.csv',
+                               'entertainment_harrypotter.csv',
+                               'entertainment_starwars.csv', 'entertainment_music.csv']
 
     # build dataset with equal priors
     X = list()
     y = list()
-    for sr in subreddits_fname:
+    for sr in subreddits_fname_phase2:
         fpath = os.path.join(dataset_dir, sr)
         threads, labels = read_file(fpath)
         t = threads[0].tolist()
@@ -306,7 +315,7 @@ if __name__ == '__main__':
         "Nearest Neighbors": KNeighborsClassifier(),
         "Linear SVM": SVC(),
         "Gradient Boosting Classifier": GradientBoostingClassifier(n_estimators=1000),
-        "Decision Tree": DecisionTreeClassifier(max_depth=2),
+        "Decision Tree": DecisionTreeClassifier(max_depth=100),
         "Random Forest": RandomForestClassifier(n_estimators=1000),
         "Naive Bayes Multinomial": MultinomialNB(),
         "Adaboost": AdaBoostClassifier(DecisionTreeClassifier(max_depth=2), n_estimators=600, learning_rate=0.5)
